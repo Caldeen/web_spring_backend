@@ -1,4 +1,4 @@
-package pl.edu.wat.backend.api;
+package pl.edu.wat.backend.dtos;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -12,8 +12,4 @@ import lombok.Setter;
 public class RegisterRequest {
     private String username;
     private String password;
-    private String firstName;
-    private String date;
-    private String lastName;
-    private int phoneNumber;
 }

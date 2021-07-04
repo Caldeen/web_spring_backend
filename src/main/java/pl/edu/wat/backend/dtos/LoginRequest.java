@@ -1,4 +1,4 @@
-package pl.edu.wat.backend.api;
+package pl.edu.wat.backend.dtos;
 
 
 import lombok.AllArgsConstructor;

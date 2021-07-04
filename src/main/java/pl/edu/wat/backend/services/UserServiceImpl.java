@@ -2,19 +2,17 @@ package pl.edu.wat.backend.services;
 
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.logging.logback.LogbackLoggingSystem;
 import org.springframework.stereotype.Service;
-import pl.edu.wat.backend.api.User;
-import pl.edu.wat.backend.jpa.UserEntity;
+import pl.edu.wat.backend.dtos.*;
+import pl.edu.wat.backend.entities.OrderEntity;
+import pl.edu.wat.backend.entities.ProductEntity;
+import pl.edu.wat.backend.entities.UserEntity;
 import pl.edu.wat.backend.repositories.UserRepository;
 
+import javax.xml.bind.annotation.adapters.CollapsedStringAdapter;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
-import java.util.Set;
-import java.util.UUID;
-import java.util.logging.Logger;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -22,28 +20,14 @@ import java.util.stream.StreamSupport;
 public class UserServiceImpl implements UserService {
     @Autowired
     private UserRepository repository;
+
     @Override
     public void add(User user) {
-        if(findUserByUsername(user.getUsername())!=null)
+        if (findUserByUsername(user.getUsername()) != null)
             return;
-        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH);
-        String date = user.getBirthDate();
-        Date dateToAdd = null;
-        if(!date.equals("--"))
-        {
-            try {
-                dateToAdd = simpleDateFormat.parse(date);
-            } catch (ParseException e) {
-                e.printStackTrace();
-            }
-        }
-        System.out.println(dateToAdd);
+
         UserEntity entity = UserEntity.builder()
-                .birthDate(dateToAdd)
                 .username(user.getUsername())
-                .firstName(user.getFirst_name())
-                .lastName(user.getLast_name())
-                .phoneNumber(user.getPhone_number())
                 .password(user.getPassword())
                 .build();
         repository.save(entity);
@@ -56,21 +40,19 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public Set<User> getAllUsers() {
-        return StreamSupport.stream(repository.findAll().spliterator(),false)
+        return StreamSupport.stream(repository.findAll().spliterator(), false)
                 .map(userEntity -> User.builder()
-                .first_name(userEntity.getFirstName())
-                .last_name(userEntity.getLastName())
-                .email(userEntity.getEmail())
-                .id(userEntity.getId())
-                .phone_number(userEntity.getPhoneNumber())
-                .password(userEntity.getPassword())
-                .build()).collect(Collectors.toSet());
+                        .first_name(userEntity.getFirstName())
+                        .last_name(userEntity.getLastName())
+                        .id(userEntity.getId())
+                        .password(userEntity.getPassword())
+                        .build()).collect(Collectors.toSet());
     }
 
     @Override
     public User findUserByToken(UUID token) {
         UserEntity userEnt = StreamSupport.stream(repository.findAll().spliterator(), false)
-                .filter(userEntity ->userEntity.getToken()!=null&& userEntity.getToken().equals(token))
+                .filter(userEntity -> userEntity.getToken() != null && userEntity.getToken().equals(token))
                 .findAny()
                 .orElse(null);
         return userEntityToUser(userEnt);
@@ -87,7 +69,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserEntity findUserEntByToken(UUID token) {
         UserEntity userEnt = StreamSupport.stream(repository.findAll().spliterator(), false)
-                .filter(userEntity ->userEntity.getToken()!=null&& userEntity.getToken().equals(token))
+                .filter(userEntity -> userEntity.getToken() != null && userEntity.getToken().equals(token))
                 .findAny()
                 .orElse(null);
         return userEnt;
@@ -110,6 +92,7 @@ public class UserServiceImpl implements UserService {
         userEntity.setToken(null);
         repository.save(userEntity);
     }
+
     @Override
     public User findUserByUsername(String username) {
         UserEntity userEnt = StreamSupport.stream(repository.findAll().spliterator(), false)
@@ -119,21 +102,86 @@ public class UserServiceImpl implements UserService {
 
         return userEntityToUser(userEnt);
     }
+
+    @Override
+    public List<ProductResponse> getUsersProducts(UUID token) {
+
+        UserEntity userEntity = findUserEntByToken(token);
+        if (userEntity == null)
+            return null;
+        return userEntity.getOrders().stream().flatMap(orderEntity -> orderEntity.getProducts().stream())
+                .map(this::productEntToProductResp)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public void addOrder(UUID token) {
+        UserEntity userEntity = findUserEntByToken(token);
+        if (userEntity == null)
+            return;
+        OrderEntity orderEntity = new OrderEntity();
+        orderEntity.setUser(userEntity);
+        orderEntity.setOrderDate(new Date());
+        userEntity.getOrders().add(orderEntity);
+        repository.save(userEntity);
+
+    }
+
+    @Override
+    public void addProduct(ProductRequest productRequest, UUID token) {
+        UserEntity user = findUserEntByToken(token);
+        if (user == null)
+            return;
+        Optional<OrderEntity> foundOrder = user.getOrders().stream().filter(orderEntity ->
+                orderEntity.getId() == productRequest.getOrderId()).findAny();
+        if (foundOrder.isEmpty())
+            return;
+        ProductEntity productEntity = new ProductEntity();
+        productEntity.setProductName(productRequest.getProductName());
+        productEntity.setProductPrice(productRequest.getProductPrice());
+        productEntity.setOrder(foundOrder.get());
+        foundOrder.get().getProducts().add(productEntity);
+        repository.save(user);
+    }
+
+    @Override
+    public List<ProductResponse> getAllProducts(UUID token) {
+        UserEntity userEntity = findUserEntByToken(token);
+        return userEntity.getOrders().stream().flatMap(orderEntity -> orderEntity.getProducts().stream())
+                .map(this::productEntToProductResp)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<OrderResponse> getUsersOrders(UUID token) {
+        UserEntity user = findUserEntByToken(token);
+        if (user == null)
+            return null;
+        return user.getOrders().stream().map(orderEntity ->
+                new OrderResponse(orderEntity.getId(), orderEntity.
+                        getProducts()
+                        .stream()
+                        .map(this::productEntToProductResp)
+                        .collect(Collectors.toList()), orderEntity.getOrderDate()))
+                .collect(Collectors.toList());
+    }
+
     private User userEntityToUser(UserEntity userEntity) {
         if (userEntity == null)
             return null;
         return User.builder()
                 .first_name(userEntity.getFirstName())
                 .last_name(userEntity.getLastName())
-                .email(userEntity.getEmail())
                 .id(userEntity.getId())
-                .phone_number(userEntity.getPhoneNumber())
                 .username(userEntity.getUsername())
                 .password(userEntity.getPassword())
-                .meetings(userEntity.getMeetings())
                 .token(userEntity.getToken())
-                .usersInvitations(userEntity.getUsersInvitations())
                 .build();
+    }
+
+    private ProductResponse productEntToProductResp(ProductEntity productEntity) {
+        return new ProductResponse(productEntity.getId(), productEntity.getProductName(),
+                productEntity.getProductPrice(), productEntity.getOrder().getId());
     }
 
 }

@@ -6,7 +6,8 @@ import lombok.*;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class OrderedProductRequest {
+public class OrderedProductResponse {
+    private int id;
     private String productName;
     private int productQuantity;
 

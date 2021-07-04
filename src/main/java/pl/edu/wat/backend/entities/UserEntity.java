@@ -1,10 +1,9 @@
-package pl.edu.wat.backend.jpa;
+package pl.edu.wat.backend.entities;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.Type;
 
 import javax.persistence.*;
 import java.util.Date;
@@ -25,14 +24,9 @@ public class UserEntity {
     private String firstName;
     private String lastName;
     private String password;
-    private Date birthDate;
-    private int phoneNumber;
     private UUID token;
+    @OneToMany(mappedBy = "user",cascade = CascadeType.ALL)
+    private List<OrderEntity> orders;
     private Boolean loggedIn ;
-    @Column(unique = true)
-    private String email;
-    @OneToMany(mappedBy = "organizer")
-    List<MeetingEntity> meetings;
-    @OneToMany(mappedBy = "userInvited")
-    List<InvitationEntity> usersInvitations;
+
 }
